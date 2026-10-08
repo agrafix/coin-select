@@ -140,22 +140,12 @@ impl<'a, M: BnbMetric> BnbIter<'a, M> {
         // for the exclusion branch, we keep banning identical candidates since selecting any one of
         // them is equivalent to selecting another. This relies on the sort placing identical
         // candidates next to each other.
-        let mut is_first_ban = true;
         let mut exclusion_cs = cs.clone();
         let to_ban = next;
         for (next_index, next) in cs.unselected() {
             if next != to_ban {
                 break;
             }
-            let (_index, _candidate) = exclusion_cs
-                .candidates()
-                .find(|(i, _)| *i == next_index)
-                .expect("must have index since we are planning to ban it");
-            if is_first_ban {
-                is_first_ban = false;
-            } /*else {
-                  println!("banning: [{}] {:?}", _index, _candidate);
-              }*/
             exclusion_cs.ban(next_index);
         }
         self.consider_adding_to_queue(&exclusion_cs, true);

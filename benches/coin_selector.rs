@@ -95,5 +95,41 @@ fn bench_run_bnb_lowest_fee(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_coin_selector_clone, bench_run_bnb_lowest_fee);
+fn bench_run_bnb_identical_candidates(c: &mut Criterion) {
+    let mut group = c.benchmark_group("run_bnb_identical_candidates");
+    group.sample_size(20);
+    for &n in &[64usize, 256, 1024, 4096] {
+        let candidates = vec![Candidate::new_tr_keyspend(100_000); n];
+        let target = Target {
+            outputs: TargetOutputs::fund_outputs([(TXOUT_BASE_WEIGHT + TR_SPK_WEIGHT, 50_000)]),
+            fee: TargetFee::from_feerate(FeeRate::from_sat_per_vb(2.0)),
+            max_weight: None,
+        };
+        let selector = CoinSelector::new(&candidates, target);
+        group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
+            b.iter_batched(
+                || selector.clone(),
+                |mut sel| {
+                    let metric = LowestFee {
+                        long_term_feerate: FeeRate::from_sat_per_vb(2.0),
+                        dust_relay_feerate: FeeRate::from_sat_per_vb(1.0),
+                        drain_weights: DrainWeights::TR_KEYSPEND,
+                    };
+                    black_box(sel.run_bnb(metric, 100).unwrap());
+                    assert_eq!(sel.selected_indices().len(), 1);
+                    sel
+                },
+                BatchSize::SmallInput,
+            );
+        });
+    }
+    group.finish();
+}
+
+criterion_group!(
+    benches,
+    bench_coin_selector_clone,
+    bench_run_bnb_lowest_fee,
+    bench_run_bnb_identical_candidates
+);
 criterion_main!(benches);
